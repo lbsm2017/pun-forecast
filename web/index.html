@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Previsione PUN</title>
+<meta name="description" content="Previsione del prezzo all'ingrosso dell'energia elettrica in Italia (PUN): fasce orarie più economiche di domani, prossimi 7 giorni, 30 giorni, 3 mesi e 12 mesi, con intervallo di confidenza al 90%.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0F1012">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0F1012;--ink:#EDEBE6;--ink2:#BDBAB2;--mute:#8C8A84;--rule:#24262A;--track:#1E2024;
+  --acc:#C8F169;--accInk:#C8F169;--accSoft:rgba(200,241,105,.12);--neg:#F08A6C;
+  --bar:#2E3136;--barHi:#6A6D73;--r:6px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+.dash{max-width:1240px;margin:0 auto;padding:20px 16px 18px}
+@media (min-width:700px){
+  body{padding:24px}
+  .dash{border:1px solid var(--rule);border-radius:10px;padding:28px 32px 22px}
+}
+p{margin:0}
+.num{font-variant-numeric:tabular-nums lining-nums;letter-spacing:-.015em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12px}
+.muted{color:var(--mute)}
+.nw{white-space:nowrap}
+.eyebrow .unit{text-transform:none;letter-spacing:.02em}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline;padding-bottom:16px;border-bottom:1px solid var(--rule)}
+.brand{font-weight:600;font-size:15px;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;margin:0}
+.brand i{width:9px;height:9px;border-radius:2px;background:var(--acc);display:inline-block}
+.meta{color:var(--mute);font-size:12px;display:flex;gap:4px 14px;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.stale{margin:16px 0 0;padding:10px 12px;border:1px solid var(--neg);border-radius:var(--r);color:var(--neg);font-size:13px}
+
+/* sections */
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px;font-weight:500;line-height:1.5}
+.sec{padding:22px 0;border-bottom:1px solid var(--rule)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:26px}
+.grid>*{min-width:0}
+@media (min-width:900px){
+  .g-trend{grid-template-columns:8fr 4fr;gap:40px}
+  .g-half{grid-template-columns:1fr 1fr;gap:40px}
+  .g-week{grid-template-columns:5fr 7fr;gap:40px}
+  .g-hours{grid-template-columns:5fr 7fr;gap:40px}
+}
+.sechead{display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sechead .eyebrow{margin:0}
+.sechead .legend{margin-top:0}
+
+/* quattro grafici reale + previsione, uno dopo l'altro */
+.cblk+.cblk{margin-top:32px}
+.csub{font-size:12px;color:var(--mute);margin-top:8px;max-width:760px}
+.g-trend .note{order:-1}
+@media (min-width:900px){.g-trend .note{order:0;position:sticky;top:24px;align-self:start}}
+
+/* charts */
+.chart{width:100%;min-height:10px}
+svg{display:block;max-width:100%}
+.chart svg{width:100%;height:auto}
+svg text{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;fill:var(--mute)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--mute);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.legend svg{display:inline-block;flex:none}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+
+/* summary note */
+.note{font-size:13px;color:var(--ink2)}
+.note p{margin:0 0 10px}
+.big{font-size:30px;font-weight:500;color:var(--ink);margin:0 0 12px;letter-spacing:-.02em;line-height:1.2}
+.big small{font-size:13px;color:var(--mute);font-weight:400;letter-spacing:0}
+.note b{color:var(--ink);font-weight:500}
+
+/* months & fasce */
+.blocks{display:grid;grid-template-columns:1fr;gap:0}
+.blk{padding:12px 0;border-top:1px solid var(--rule);display:grid;grid-template-columns:1fr auto;gap:2px 16px;align-items:baseline}
+.blk:first-child{border-top:0;padding-top:0}
+.blk .l{font-size:12px;color:var(--mute);grid-column:1/-1}
+.blk .v{font-size:22px;font-weight:500;letter-spacing:-.02em}
+.blk .v small{font-size:12px;color:var(--mute);font-weight:400;margin-left:4px;letter-spacing:0}
+.blk .i{font-size:12px;color:var(--mute);text-align:right}
+.blk .rng{grid-column:1/-1;margin-top:8px}
+@media (min-width:600px){
+  .blocks.b3{grid-template-columns:repeat(3,1fr);gap:20px}
+  .blocks.b2{grid-template-columns:repeat(2,1fr);gap:24px}
+  .blocks .blk{border-top:0;padding:0;display:block}
+  .blk .i{text-align:left;margin-top:2px}
+}
+.rng{position:relative;height:6px;background:var(--track);border-radius:3px;display:block;width:100%}
+.rng i{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--barHi)}
+.rng b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--ink);border-radius:1px}
+.expl{font-size:13px;color:var(--ink2);margin-top:14px}
+.expl p+p{margin-top:6px}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px 24px}
+.kpi .l{font-size:12px;color:var(--mute)}
+.kpi .v{font-size:22px;font-weight:500;margin-top:2px;letter-spacing:-.02em}
+.kpi .v small{font-size:12px;color:var(--mute);font-weight:400;margin-left:5px;letter-spacing:0;font-family:'IBM Plex Sans',system-ui,sans-serif}
+.kpi .d{font-size:12px;margin-top:1px;color:var(--mute)}
+.up{color:var(--neg)} .dn{color:var(--accInk)}
+
+/* week table */
+table{width:100%;border-collapse:collapse}
+td,th{padding:8px 0;border-top:1px solid var(--rule);font-weight:400;text-align:right;vertical-align:middle}
+th{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;border-top:0;padding-top:0;font-weight:500}
+td:first-child,th:first-child{text-align:left}
+td.c-rng,th.c-rng{width:42%;padding-left:16px}
+tr.best td{color:var(--accInk);font-weight:500}
+tr.best .rng i{background:var(--acc)}
+.tag{font-size:11px;color:var(--mute);margin-left:6px;font-weight:400;white-space:nowrap}
+tr.best .tag{color:var(--accInk)}
+
+/* hours */
+.hours-h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0 0 10px}
+.hours-h .eyebrow{margin:0}
+.badge{font-size:11px;line-height:1.4;padding:1px 7px;border-radius:var(--r);border:1px solid var(--rule);color:var(--ink2);white-space:nowrap}
+.badge.def{border-color:transparent;background:var(--accSoft);color:var(--accInk)}
+.windows{font-size:28px;line-height:1.25;font-weight:600;letter-spacing:-.025em;margin:4px 0 10px;color:var(--ink)}
+.windows em{font-style:normal;color:var(--accInk);background:var(--accSoft);padding:0 6px;border-radius:4px;white-space:nowrap}
+@media (min-width:600px){.windows{font-size:34px}}
+.lede{color:var(--mute);margin:0 0 22px}
+.strip{display:grid;gap:2px;height:30px}
+.strip b{border-radius:2px;display:block}
+.ticks{position:relative;height:16px;font-size:11px;color:var(--mute);margin-top:5px}
+.ticks span{position:absolute;top:0;transform:translateX(-50%)}
+.ticks span:first-child{transform:none}
+.ticks span:last-child{transform:translateX(-100%)}
+.chips{margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{font-size:12px;padding:2px 8px;border-radius:var(--r);border:1px solid var(--rule);color:var(--ink);white-space:nowrap}
+.chip.best{border-color:transparent;background:var(--accSoft);color:var(--accInk);font-weight:500}
+.chips .sub2{font-size:13px;color:var(--ink2)}
+.after{margin-top:26px}
+
+/* fotovoltaico e accumulo (solo pagina locale) */
+.kpis.pvdays{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:600px){.kpis.pvdays{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.pvdays .kpi .rng{margin-top:8px}
+
+/* reliability & footer */
+.rel{font-size:13px;color:var(--ink2)}
+.rel p{max-width:880px}
+.rel p+p{margin-top:6px}
+.foot{display:grid;grid-template-columns:1fr;gap:8px 24px;padding-top:14px;font-size:12px;color:var(--mute)}
+.foot ul{margin:0;padding:0;list-style:none}
+@media (min-width:900px){.foot{grid-template-columns:1fr auto}.foot ul{text-align:right}}
+.err{color:var(--neg)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main class="dash" id="app">
+  <noscript><p>Questa pagina richiede JavaScript per mostrare grafici e previsioni.</p></noscript>
+</main>
+<script id="pun-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  'use strict';
+  var app = document.getElementById('app');
+  var D;
+  try { D = JSON.parse(document.getElementById('pun-data').textContent); }
+  catch (e) { app.innerHTML = '<p class="err">Dati non disponibili.</p>'; return; }
+
+  /* ---------------------------------------------------------- formattazione */
+  var nf3 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  var nf1 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  function f3(v) { return (v == null || isNaN(v)) ? '–' : nf3.format(v); }
+  function pct(x) { return Math.round(Math.abs(x) * 100) + '%'; }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function pd(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function dn(s) { var p = s.split('-'); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 864e5); }
+  var fDM = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
+  var fWD = new Intl.DateTimeFormat('it-IT', { weekday: 'short' });
+  var fLong = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  var fDMY = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  function clean(s) { return s.replace(/\./g, ''); }
+  function dm(s) { return clean(fDM.format(pd(s))); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function dayShort(s) { return cap(clean(fWD.format(pd(s)))) + ' ' + pd(s).getDate(); }
+  function dayLong(s) { return fLong.format(pd(s)); }
+  function hh(h) { return (h < 10 ? '0' : '') + h; }
+  function win(w) { return hh(w[0]) + '–' + hh(w[1]); }
+  /* etichetta e ora dell'indice i: nei giorni di 23/25 ore (cambio d'ora) l'indice non coincide con l'ora */
+  function labOf(day, i) { return day.labels && day.labels[i] != null ? String(day.labels[i]) : hh(i); }
+  function hourOf(day, i) { var h = parseInt(labOf(day, i), 10); return isNaN(h) ? i : h; }
+  function inWins(ws, h) { for (var k = 0; k < ws.length; k++) if (h >= ws[k][0] && h < ws[k][1]) return true; return false; }
+  function joinIt(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1]; }
+  function mean(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return a.length ? s / a.length : NaN; }
+  function pluck(a, k) { return a.map(function (o) { return o[k]; }); }
+  function col(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  /* variazione percentuale: rel = "rispetto a oggi", same = "in linea con oggi" */
+  function delta(x, rel, same) {
+    if (!isFinite(x)) return '';
+    if (Math.round(Math.abs(x) * 100) === 0) return '<span class="muted">' + same + '</span>';
+    return x > 0 ? '<span class="up">▲ ' + pct(x) + ' ' + rel + '</span>'
+                 : '<span class="dn">▼ ' + pct(x) + ' ' + rel + '</span>';
+  }
+
+  /* tacche "tonde" per l'asse dei prezzi */
+  function niceTicks(lo, hi, n) {
+    var steps = [0.001, 0.002, 0.005, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1];
+    var st = steps[steps.length - 1];
+    for (var i = 0; i < steps.length; i++) {
+      if (Math.ceil(hi / steps[i] - 1e-9) - Math.floor(lo / steps[i] + 1e-9) <= n + 1) { st = steps[i]; break; }
+    }
+    var a = Math.floor(lo / st + 1e-9) * st, b = Math.ceil(hi / st - 1e-9) * st, t = [];
+    if (b - a < st) b = a + st;
+    for (var v = a; v <= b + st / 2; v += st) t.push(+v.toFixed(4));
+    return { lo: a, hi: b, t: t, st: st };
+  }
+  function svgOpen(W, H, label) {
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H +
+      '" role="img" aria-label="' + esc(label) + '" focusable="false">';
+  }
+
+  /* ---------------------------------------------------------------- stato */
+  var hist = D.history || [];
+  var f30 = D.forecast30 || [], f90 = D.forecast90 || [], f365 = D.forecast365 || [];
+  var h7 = D.hourly7 || {};
+  var tm = D.tomorrow, da = D.day_after;
+  var tT = dn(D.today);
+
+  /* ------------------------------------------- grafico reale + previsione
+     Un'unica funzione per i quattro grafici. Le x sono in giorni (anche frazionari per i dati orari).
+     sp = { act: [{x, v}], fc: [{x, q05, q50, q95}], xT: "oggi", cap: tetto dell'asse (facoltativo),
+            ticks: function (pxPerGiorno, larghezza) → [{x, tx?, lab}], label: testo per i lettori di schermo } */
+  function trendChart(el, sp) {
+    var act = sp.act, fc = sp.fc;
+    var W = Math.max(260, Math.round(el.clientWidth || 600)), H = W < 520 ? 190 : 220;
+    var P = { l: 40, r: 8, t: 18, b: 22 }, PW = W - P.l - P.r;
+    var x0 = act[0].x, xN = fc[fc.length - 1].x, N = Math.max(1e-6, xN - x0);
+    var X = function (x) { return P.l + (x - x0) * PW / N; };
+    var lo = Math.min(Math.min.apply(null, pluck(act, 'v')), Math.min.apply(null, pluck(fc, 'q05')));
+    var hi = Math.max(Math.max.apply(null, pluck(act, 'v')), Math.max.apply(null, pluck(fc, 'q95')));
+    if (sp.cap && hi > sp.cap) hi = sp.cap;
+    var tk = niceTicks(lo, hi, 4);
+    var Y = function (v) { return P.t + (H - P.t - P.b) * (1 - (Math.min(v, tk.hi) - tk.lo) / (tk.hi - tk.lo)); };
+    var pt = function (x, v) { return X(x).toFixed(1) + ' ' + Y(v).toFixed(1); };
+    var c = { rule: col('--rule'), ink: col('--ink'), acc: col('--accInk'), soft: col('--accSoft'), mute: col('--mute') };
+    var s = '';
+    tk.t.forEach(function (g) {
+      var y = Y(g).toFixed(1);
+      s += '<line x1="' + P.l + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="' + c.rule + '"/>' +
+           '<text x="0" y="' + (+y + 3) + '">' + f3(g) + '</text>';
+    });
+    var last = act[act.length - 1], j = pt(last.x, last.v);
+    var top = fc.map(function (r) { return pt(r.x, r.q95); });
+    var bot = fc.map(function (r) { return pt(r.x, r.q05); }).reverse();
+    s += '<path d="M' + j + ' L' + top.join(' L') + ' L' + bot.join(' L') + 'Z" fill="' + c.soft + '"/>';
+    var xT = X(Math.min(Math.max(sp.xT, x0), xN)).toFixed(1);
+    s += '<line x1="' + xT + '" x2="' + xT + '" y1="' + P.t + '" y2="' + (H - P.b) + '" stroke="' + c.mute + '" stroke-dasharray="2 3"/>' +
+         '<text x="' + (+xT + 5) + '" y="' + (P.t + 8) + '">oggi</text>';
+    s += '<path d="M' + act.map(function (r) { return pt(r.x, r.v); }).join(' L') +
+         '" fill="none" stroke="' + c.ink + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<path d="M' + j + ' L' + fc.map(function (r) { return pt(r.x, r.q50); }).join(' L') +
+         '" fill="none" stroke="' + c.acc + '" stroke-width="1.6" stroke-dasharray="5 4" stroke-linejoin="round"/>';
+    // etichette sull'asse delle date: saltate se si sovrapporrebbero
+    var prevR = -1e9;
+    sp.ticks(PW / N, PW).forEach(function (k) {
+      if (k.x < x0 - 1e-6 || k.x > xN + 1e-6) return;
+      var x = X(k.x), lx = X(k.tx != null ? k.tx : k.x), tw = k.lab.length * 6.1, anchor = 'middle', left = lx - tw / 2;
+      if (lx + tw / 2 > W) { anchor = 'end'; left = lx - tw; lx = Math.min(lx, W); }
+      else if (left < 0) { anchor = 'start'; left = lx; }
+      if (left < prevR + 8) return;
+      prevR = left + tw;
+      s += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + (H - P.b) + '" y2="' + (H - P.b + 3) + '" stroke="' + c.rule + '"/>' +
+           '<text x="' + lx.toFixed(1) + '" y="' + (H - 5) + '" text-anchor="' + anchor + '">' + k.lab + '</text>';
+    });
+    el.innerHTML = svgOpen(W, H, sp.label) + s + '</svg>';
+  }
+
+  /* ----------------------------------------- dati e tacche dei quattro grafici */
+  function dayLab(d) { return clean(fDM.format(new Date(d * 864e5 + 12 * 36e5))); }
+  var fMon = new Intl.DateTimeFormat('it-IT', { month: 'short', timeZone: 'UTC' });
+  /* una tacca ogni k elementi (k multiplo di base), allineate all'elemento a, al massimo maxT tacche */
+  function every(cands, a, base, maxT) {
+    var k = base, out;
+    do {
+      out = cands.filter(function (c, i) { return (i - a) % k === 0; });
+      k += base;
+    } while (out.length > maxT && k <= cands.length);
+    return out;
+  }
+  function dailyTicks(x0, xN, base) {
+    return function (pw, PW) {
+      var cands = [];
+      for (var d = Math.ceil(x0); d <= xN; d++) cands.push({ x: d, lab: dayLab(d) });
+      return every(cands, tT - Math.ceil(x0), base, Math.max(2, Math.floor(PW / 54)));
+    };
+  }
+  function monthTicks(x0, xN) {
+    return function (pw, PW) {
+      var a = new Date(x0 * 864e5), y = a.getUTCFullYear(), m = a.getUTCMonth() + 1, cands = [], jan = -1;
+      for (;;) {
+        var d = Math.round(Date.UTC(y, m, 1) / 864e5);
+        if (d > xN) break;
+        var dt = new Date(d * 864e5), mo = dt.getUTCMonth();
+        if (mo === 0 && jan < 0) jan = cands.length;
+        cands.push({ x: d, lab: clean(fMon.format(dt)) + (mo === 0 ? ' ' + dt.getUTCFullYear() : '') });
+        m++;
+      }
+      // passi di 1, 2, 3, 6 o 12 mesi allineati a gennaio, così l'etichetta con l'anno resta sempre visibile
+      var maxT = Math.max(2, Math.floor(PW / 50)), steps = [1, 2, 3, 6, 12], out = cands;
+      for (var i = 0; i < steps.length; i++) {
+        out = cands.filter(function (c, n) { return (n - Math.max(0, jan)) % steps[i] === 0; });
+        if (out.length <= maxT) break;
+      }
+      return out;
+    };
+  }
+  function series(rows) { return rows.map(function (r) { return { x: dn(r.d), v: r.v }; }); }
+  function fseries(rows) { return rows.map(function (r) { return { x: dn(r.d), q05: r.q05, q50: r.q50, q95: r.q95 }; }); }
+  /* medie di 7 giorni (le settimane reali finiscono oggi, quelle previste partono domani) */
+  function weeks(rows, keys, fromEnd) {
+    var out = [], n = rows.length, i;
+    var push = function (ch) {
+      if (ch.length < 4) return;
+      var o = { x: mean(ch.map(function (r) { return dn(r.d); })) };
+      keys.forEach(function (k) { o[k] = mean(pluck(ch, k)); });
+      out.push(o);
+    };
+    if (fromEnd) { for (i = n; i > 0; i -= 7) push(rows.slice(Math.max(0, i - 7), i)); out.reverse(); }
+    else for (i = 0; i < n; i += 7) push(rows.slice(i, i + 7));
+    return out;
+  }
+  function endTxt(end, when) {
+    return when + ' mediana ' + f3(end.q50) + ', intervallo 90% ' + f3(end.q05) + ' – ' + f3(end.q95) + '.';
+  }
+
+  var charts = [];
+  (function () {
+    // 1) prossimi 7 giorni, orario: ultimi 3 giorni reali + previsione ora per ora
+    var ha = (h7.actual || []).slice(-72), hf = h7.forecast || [];
+    if (ha.length && hf.length) {
+      var hx = function (t) { return Date.parse(t) / 864e5; };
+      var act = ha.map(function (r) { return { x: hx(r.t), v: r.v }; });
+      var fc = hf.map(function (r) { return { x: hx(r.t), q05: r.q05, q50: r.q50, q95: r.q95 }; });
+      var mid = ha.concat(hf).filter(function (r) { return r.t.slice(11, 13) === '00'; });
+      var today0 = ha.filter(function (r) { return r.t.slice(0, 10) === D.today && r.t.slice(11, 13) === '00'; })[0];
+      var lastF = hf[hf.length - 1];
+      charts.push({ id: 'c7', title: 'Prossimi 7 giorni · prezzo orario',
+        sp: { act: act, fc: fc, xT: today0 ? hx(today0.t) : fc[0].x,
+          ticks: function (pw) {
+            // una tacca a mezzanotte, etichetta del giorno a metà giornata
+            return mid.map(function (r) {
+              var d = r.t.slice(0, 10);
+              return { x: hx(r.t), tx: hx(r.t) + 0.5, lab: pw >= 46 ? dayShort(d) : String(pd(d).getDate()) };
+            });
+          },
+          label: 'Prezzo orario in €/kWh: ultimi ' + Math.round(ha.length / 24) + ' giorni reali e previsione ora per ora fino a ' +
+            dayLong(lastF.t.slice(0, 10)) + '. ' + endTxt(lastF, 'Ultima ora prevista:') } });
+    }
+    // 2) e 3) medie giornaliere: 30 giorni e 3 mesi
+    [[f30, 15, 7, 'c30', 'Prossimi 30 giorni · media giornaliera', 'Fra 30 giorni'],
+     [f90, 45, 14, 'c90', 'Prossimi 3 mesi · media giornaliera', 'Fra 3 mesi']].forEach(function (o) {
+      var h = hist.slice(-o[1]), fc = o[0];
+      if (!h.length || !fc.length) return;
+      var a = series(h), f = fseries(fc), end = fc[fc.length - 1];
+      charts.push({ id: o[3], title: o[4],
+        sp: { act: a, fc: f, xT: tT, ticks: dailyTicks(a[0].x, f[f.length - 1].x, o[2]),
+          label: 'Prezzo medio giornaliero in €/kWh: ultimi ' + h.length + ' giorni reali (' + dm(h[0].d) + ' – ' + dm(h[h.length - 1].d) +
+            ') e previsione fino al ' + dm(end.d) + '. Oggi ' + f3(D.today_mean) + '. ' + endTxt(end, o[5] + ' (' + dm(end.d) + '):') } });
+    });
+    // 4) 12 mesi: medie settimanali (le medie giornaliere su un anno sono troppo fitte per leggerle)
+    if (hist.length >= 7 && f365.length >= 7) {
+      var a = weeks(hist, ['v'], true), f = weeks(f365, ['q05', 'q50', 'q95'], false);
+      var base = Math.max(Math.max.apply(null, pluck(a, 'v')), Math.max.apply(null, pluck(f, 'q50')));
+      var top = Math.max.apply(null, pluck(f, 'q95')), cap = top > 2 * base ? 2 * base : 0;
+      var end = f365[f365.length - 1];
+      var note = 'Medie settimanali dei prezzi giornalieri. Oltre i 3 mesi la previsione non è verificata dal backtest: è solo indicativa.';
+      if (cap) note += ' Più avanti l’intervallo 90% esce dalla scala del grafico: arriva a ' + f3(top) + ' €/kWh.';
+      charts.push({ id: 'c365', title: 'Prossimi 12 mesi · media settimanale', note: note,
+        sp: { act: a, fc: f, xT: tT, cap: cap, ticks: monthTicks(a[0].x, f[f.length - 1].x),
+          label: 'Prezzo medio settimanale in €/kWh: ultimi 12 mesi reali e previsione indicativa fino al ' + dm(end.d) + '. ' +
+            endTxt(end, 'Ultimo giorno previsto:') } });
+    }
+  })();
+
+  /* ------------------------------------------------------ grafico orario */
+  function barsChart(el, day) {
+    var v = day.hours || [], n = v.length;
+    if (!n) { el.innerHTML = ''; return; }
+    var W = Math.max(260, Math.round(el.clientWidth || 560)), H = W < 520 ? 180 : 200;
+    var P = { l: 40, r: 2, t: 24, b: 20 }, bw = (W - P.l - P.r) / n;
+    var order = v.map(function (x, i) { return i; }).sort(function (a, b) { return v[a] - v[b]; });
+    var cheap = {}, dear = {};
+    order.slice(0, 6).forEach(function (i) { cheap[i] = 1; });
+    order.slice(-6).forEach(function (i) { dear[i] = 1; });
+    var mn = v[order[0]], mx = v[order[n - 1]];
+    // asse da zero: le barre partono da 0 €/kWh, così le differenze fra le ore non sono esagerate
+    var tk = niceTicks(Math.min(0, mn), Math.max(mx, 0.001), 3);
+    var Y = function (x) { return P.t + (H - P.t - P.b) * (1 - (x - tk.lo) / (tk.hi - tk.lo)); };
+    var c = { rule: col('--rule'), acc: col('--acc'), accInk: col('--accInk'), bar: col('--bar'), hi: col('--barHi') };
+    var s = '';
+    tk.t.forEach(function (g) {
+      var y = Y(g).toFixed(1);
+      s += '<line x1="' + P.l + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="' + c.rule + '"/>' +
+           '<text x="0" y="' + (+y + 3) + '">' + f3(g) + '</text>';
+    });
+    var gap = bw > 10 ? 3 : 2;
+    v.forEach(function (x, i) {
+      var y = Y(x), y0 = Y(Math.max(0, tk.lo)), fill = cheap[i] ? c.acc : (dear[i] ? c.hi : c.bar);
+      var tip = labOf(day, i) + ':00 · ' + f3(x) + ' €/kWh' +
+        (day.q05 && day.q95 ? ' (90%: ' + f3(day.q05[i]) + '–' + f3(day.q95[i]) + ')' : '');
+      s += '<rect x="' + (P.l + i * bw + gap / 2).toFixed(1) + '" y="' + Math.min(y, y0 - 1).toFixed(1) + '" width="' + Math.max(1, bw - gap).toFixed(1) +
+           '" height="' + Math.max(1, Math.abs(y0 - y)).toFixed(1) + '" rx="2" fill="' + fill + '"><title>' + tip + '</title></rect>';
+    });
+    // segno sopra le fasce più economiche (finestre in ore → indici delle barre); etichetta sulla più lunga
+    var ws = (day.cheap || []).map(function (w) {
+      var a = -1, b = -1;
+      for (var i = 0; i < n; i++) if (inWins([w], hourOf(day, i))) { if (a < 0) a = i; b = i + 1; }
+      return [a, b];
+    }).filter(function (w) { return w[0] >= 0; }), longest = null;
+    ws.forEach(function (w) {
+      var x0 = P.l + w[0] * bw + 1, x1 = P.l + w[1] * bw - 1;
+      s += '<path d="M' + x0.toFixed(1) + ' 14 H' + x1.toFixed(1) + '" stroke="' + c.accInk + '" stroke-width="1.4"/>';
+      if (!longest || w[1] - w[0] > longest[1] - longest[0]) longest = w;
+    });
+    if (longest) {
+      var lx = P.l + longest[0] * bw + 1, txt = 'più economiche', tw = txt.length * 6.1, anchor = 'start';
+      if (lx + tw > W) { lx = Math.min(W, P.l + longest[1] * bw - 1); anchor = 'end'; }
+      s += '<text x="' + lx.toFixed(1) + '" y="9" text-anchor="' + anchor + '" style="fill:' + c.accInk + '">' + txt + '</text>';
+    }
+    // tacche orarie sulle ore reali (00, 03, 06…), alla prima occorrenza: corrette anche nei giorni di 23/25 ore
+    var every = bw * 3 >= 26 ? 3 : 6;
+    for (var hr = 0; hr < n; hr++) {
+      var hv = hourOf(day, hr);
+      if (hv % every || (hr > 0 && hourOf(day, hr - 1) === hv)) continue;
+      s += '<text x="' + (P.l + hr * bw + bw / 2).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="middle">' + labOf(day, hr) + '</text>';
+    }
+    var label = 'Prezzo orario ' + (day.kind === 'actual' ? 'definitivo' : 'previsto') + ' per ' + dayLong(day.date) +
+      ', in €/kWh: minimo ' + f3(day.min.v) + ' alle ' + hh(day.min.h) + ', massimo ' + f3(day.max.v) + ' alle ' + hh(day.max.h) +
+      '. Ore più economiche: ' + joinIt((day.cheap || []).map(win)) + '. Ore più care: ' + joinIt((day.dear || []).map(win)) + '.';
+    el.innerHTML = svgOpen(W, H, label) + s + '</svg>';
+  }
+
+  function strip(day) {
+    var v = day.hours || [], n = v.length;
+    var l = Math.min.apply(null, v), u = Math.max.apply(null, v), span = (u - l) || 1;
+    var ws = day.cheap || [];
+    var cells = v.map(function (x, i) {
+      var k = (u - x) / span, ch = inWins(ws, hourOf(day, i)); // k = 1: ora più economica
+      var bg = ch ? 'var(--acc)' : 'var(--barHi)';
+      var op = ch ? (0.55 + 0.45 * k) : (0.3 + 0.6 * (1 - k));
+      return '<b title="' + labOf(day, i) + ':00 · ' + f3(x) + ' €/kWh" style="background:' + bg + ';opacity:' + op.toFixed(2) + '"></b>';
+    }).join('');
+    // tacche 00/06/12/18 all'inizio della cella dell'ora (prima occorrenza), 24 a fine giornata
+    var ticks = '';
+    for (var i = 0; i < n; i++) {
+      var hv = hourOf(day, i);
+      if (hv % 6 || (i > 0 && hourOf(day, i - 1) === hv)) continue;
+      ticks += '<span style="left:' + (i / n * 100).toFixed(2) + '%">' + labOf(day, i) + '</span>';
+    }
+    ticks += '<span style="left:100%">24</span>';
+    var label = 'Prezzo orario ' + (day.kind === 'actual' ? 'definitivo' : 'previsto') + ' per ' + dayLong(day.date) +
+      ': ore più economiche ' + joinIt(ws.map(win)) + ', media ' + f3(day.mean) + ' €/kWh.';
+    return '<div class="strip" role="img" aria-label="' + esc(label) + '" style="grid-template-columns:repeat(' + n + ',minmax(0,1fr))">' + cells + '</div>' +
+      '<div class="ticks mono" aria-hidden="true">' + ticks + '</div>';
+  }
+
+  /* ------------------------------------------------------------- testi */
+  function noteHtml() {
+    var t = D.today_mean;
+    var hs = [[f30, '30 giorni'], [f90, '3 mesi']].filter(function (o) { return o[0].length; });
+    var s = '<h2 class="eyebrow">In sintesi</h2><p class="big num">' + f3(t) + ' <small>€/kWh oggi</small></p>';
+    if (!hs.length || !t) return s;
+    var rel = function (x) { return Math.round(Math.abs(x) * 100) === 0 ? 'in linea con oggi' : 'il ' + pct(x) + (x > 0 ? ' sopra' : ' sotto') + ' oggi'; };
+    var avg = hs.map(function (o) { return mean(pluck(o[0], 'q50')); });
+    var x = (avg[0] - t) / t, word = Math.round(Math.abs(x) * 100) <= 3 ? 'stabile' : (x > 0 ? 'in salita' : 'in discesa');
+    s += '<p><b>Tendenza a ' + hs[0][1] + ': ' + word + '.</b> ' + hs.map(function (o, i) {
+      return (i ? 'nei prossimi ' : 'Nei prossimi ') + o[1] + ' la media prevista è <span class="num">' + f3(avg[i]) + '</span> €/kWh, ' + rel((avg[i] - t) / t);
+    }).join('; ') + '.</p>';
+    s += '<p>L’incertezza cresce con l’orizzonte. Con il 90% di probabilità il prezzo medio giornaliero sarà ' + hs.map(function (o) {
+      var end = o[0][o[0].length - 1];
+      return 'fra <span class="num nw">' + f3(end.q05) + '</span> e <span class="num nw">' + f3(end.q95) + '</span> €/kWh fra ' + o[1] + ' (' + dm(end.d) + ')';
+    }).join(' e ') + '.</p>';
+    return s;
+  }
+
+  function legendHtml() {
+    return '<div class="legend" aria-hidden="true"><span><svg width="18" height="6"><line x1="0" x2="18" y1="3" y2="3" stroke="var(--ink)" stroke-width="2"/></svg>reale</span>' +
+      '<span><svg width="18" height="6"><line x1="0" x2="18" y1="3" y2="3" stroke="var(--accInk)" stroke-width="2" stroke-dasharray="4 3"/></svg>previsione</span>' +
+      '<span><i class="sw" style="background:var(--accSoft);width:14px"></i>intervallo 90%</span></div>';
+  }
+
+  function chartsHtml() {
+    return charts.map(function (ch) {
+      return '<div class="cblk"><div class="sechead"><h2 class="eyebrow" id="h-' + ch.id + '">' + ch.title +
+        ', <span class="unit">€/kWh</span></h2>' + legendHtml() + '</div>' +
+        '<div class="chart" id="' + ch.id + '"></div>' + (ch.note ? '<p class="csub">' + esc(ch.note) + '</p>' : '') + '</div>';
+    }).join('');
+  }
+
+  function rangeBar(lo, hi, a, b, m) {
+    var sp = (hi - lo) || 1, L = (a - lo) / sp * 100, R = (b - lo) / sp * 100, M = (m - lo) / sp * 100;
+    return '<span class="rng" aria-hidden="true"><i style="left:' + L.toFixed(1) + '%;width:' + (R - L).toFixed(1) + '%"></i>' +
+      (m != null ? '<b style="left:' + M.toFixed(1) + '%"></b>' : '') + '</span>';
+  }
+
+  function monthsHtml() {
+    var ms = D.months || [];
+    if (!ms.length) return '';
+    var lo = Math.min.apply(null, pluck(ms, 'q05')), hi = Math.max.apply(null, pluck(ms, 'q95'));
+    return '<h2 class="eyebrow">Prossimi 3 mesi · media giornaliera prevista</h2><div class="blocks b3">' +
+      ms.map(function (m) {
+        return '<div class="blk"><div class="l">' + dm(m.from) + ' – ' + dm(m.to) + '</div>' +
+          '<div class="v num">' + f3(m.q50) + '<small>€/kWh</small></div>' +
+          '<div class="i num">intervallo 90%: ' + f3(m.q05) + ' – ' + f3(m.q95) + '</div>' +
+          rangeBar(lo, hi, m.q05, m.q95, m.q50) + '</div>';
+      }).join('') + '</div>' +
+      '<div class="expl"><p class="muted">La barra mostra l’intervallo al 90% sulla stessa scala per i tre periodi: più è larga, più la previsione è incerta.</p></div>';
+  }
+
+  function fasceHtml() {
+    var F = D.fasce;
+    if (!F || !F.F1 || !F.F23) return '';
+    var lo = Math.min(F.F1.q05, F.F23.q05), hi = Math.max(F.F1.q95, F.F23.q95);
+    var one = function (name, sub, f) {
+      return '<div class="blk"><div class="l">' + name + ' · ' + sub + '</div>' +
+        '<div class="v num">' + f3(f.q50) + '<small>€/kWh</small></div>' +
+        '<div class="i num">intervallo 90%: ' + f3(f.q05) + ' – ' + f3(f.q95) + '</div>' +
+        rangeBar(lo, hi, f.q05, f.q95, f.q50) + '</div>';
+    };
+    var x = (F.F1.q50 - F.F23.q50) / F.F23.q50;
+    var cmp = Math.round(Math.abs(x) * 100) === 0 ? 'In media F1 e F2/F3 hanno un prezzo previsto simile.'
+      : 'In media la fascia F1 è prevista il ' + pct(x) + (x > 0 ? ' più cara' : ' più economica') + ' di F2/F3.';
+    return '<h2 class="eyebrow">Fasce F1 e F2/F3 · prossimi 30 giorni</h2><div class="blocks b2">' +
+      one('F1', 'feriali 8–19', F.F1) + one('F2/F3', 'sere, notti, weekend', F.F23) + '</div>' +
+      '<div class="expl"><p>' + cmp + '</p><p class="muted">F1: lunedì–venerdì dalle 8 alle 19. F2/F3: sere, notti, weekend e festivi. Valori medi previsti con intervallo al 90%.</p></div>';
+  }
+
+  function weekHtml() {
+    var w = D.week || [];
+    if (!w.length) return '';
+    var means = pluck(w, 'mean'), avg = mean(means), bi = means.indexOf(Math.min.apply(null, means));
+    var best = w[bi], prev = mean(pluck(hist.slice(-7), 'v'));
+    var lo = Math.min.apply(null, pluck(w, 'min')), hi = Math.max.apply(null, pluck(w, 'max'));
+    var pad = (hi - lo) * 0.05; lo -= pad; hi += pad;
+    var rows = w.map(function (r, i) {
+      var tag = i === bi ? '<span class="tag">più economico</span>' : (r.kind === 'actual' ? '<span class="tag">definitivo</span>' : '');
+      if (i === bi && r.kind === 'actual') tag += '<span class="tag">definitivo</span>';
+      return '<tr' + (i === bi ? ' class="best"' : '') + '><td>' + dayShort(r.date) + tag + '</td>' +
+        '<td class="num">' + f3(r.mean) + '</td>' +
+        '<td class="c-rng" title="min ' + f3(r.min) + ' – max ' + f3(r.max) + ' €/kWh">' + rangeBar(lo, hi, r.min, r.max, null) +
+        '<span class="sr">da ' + f3(r.min) + ' a ' + f3(r.max) + ' €/kWh</span></td></tr>';
+    }).join('');
+    return '<div><h2 class="eyebrow">Prossimi 7 giorni</h2><div class="kpis">' +
+        '<div class="kpi"><div class="l">Giorno più economico</div><div class="v num">' + f3(best.mean) + '<small>' + dayShort(best.date).toLowerCase() + '</small></div>' +
+        '<div class="d num">' + delta((best.mean - avg) / avg, 'sulla media', 'in linea con la media') + '</div></div>' +
+        '<div class="kpi"><div class="l">Media della settimana</div><div class="v num">' + f3(avg) + '<small>€/kWh</small></div>' +
+        '<div class="d num">' + delta((avg - prev) / prev, 'sui 7 giorni scorsi', 'in linea con i 7 giorni scorsi') + '</div></div>' +
+      '</div><p class="expl muted">Prezzo medio giornaliero e escursione fra l’ora più economica e la più cara di ogni giorno, in €/kWh.</p></div>' +
+      '<div><table><caption class="sr">Prezzo medio previsto nei prossimi 7 giorni, in €/kWh</caption>' +
+      '<thead><tr><th scope="col">Giorno</th><th scope="col">Media</th><th scope="col" class="c-rng">Min – max</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>';
+  }
+
+  function badge(day) {
+    return day.kind === 'actual' ? '<span class="badge def">prezzi definitivi</span>' : '<span class="badge">previsione</span>';
+  }
+
+  function hoursHtml() {
+    if (!tm || !tm.hours) return '';
+    var fc = tm.kind !== 'actual';
+    var cheapW = (tm.cheap || []).map(function (w) { return '<em class="num">' + win(w) + '</em>'; });
+    var dearW = (tm.dear || []).map(win);
+    var spread = (tm.max.v - tm.min.v) / tm.min.v;
+    var lede = 'Le ore più care sono ' + joinIt(dearW) + ': alle ' + hh(tm.max.h) + ' il prezzo ' + (fc ? 'previsto ' : '') +
+      'è il ' + pct(spread) + ' più alto che alle ' + hh(tm.min.h) + ', l’ora più economica.';
+    var band = function (m) { return fc && m.band ? '<div class="d num">intervallo 90%: <span class="nw">' + f3(m.band[0]) + '–' + f3(m.band[1]) + '</span></div>' : ''; };
+    var left = '<div><div class="hours-h"><h2 class="eyebrow">Fasce orarie più convenienti · domani, ' + dayLong(tm.date) + '</h2>' + badge(tm) + '</div>' +
+      '<p class="windows">' + cheapW.join(' e ') + '</p>' +
+      '<p class="lede">' + lede + '</p>' +
+      '<div class="kpis">' +
+        '<div class="kpi"><div class="l">' + (fc ? 'Media prevista' : 'Media') + '</div><div class="v num">' + f3(tm.mean) + '<small>€/kWh</small></div>' +
+          '<div class="d num">' + delta((tm.mean - D.today_mean) / D.today_mean, 'rispetto a oggi', 'in linea con oggi') + '</div></div>' +
+        '<div class="kpi"><div class="l">Ora più economica</div><div class="v num">' + f3(tm.min.v) + '<small>alle ' + hh(tm.min.h) + '</small></div>' + band(tm.min) + '</div>' +
+        '<div class="kpi"><div class="l">Ora più cara</div><div class="v num">' + f3(tm.max.v) + '<small>alle ' + hh(tm.max.h) + '</small></div>' + band(tm.max) + '</div>' +
+      '</div></div>';
+    var right = '<div><h2 class="eyebrow">Prezzo orario ' + (fc ? 'previsto' : 'definitivo') + ' · domani, <span class="unit">€/kWh</span></h2><div class="chart" id="bars"></div>' +
+      '<div class="legend"><span><i class="sw" style="background:var(--acc)"></i>6 ore più economiche</span>' +
+      '<span><i class="sw" style="background:var(--barHi)"></i>6 ore più care</span></div>';
+    if (da && da.hours) {
+      var x = (da.mean - tm.mean) / tm.mean;
+      right += '<div class="after"><div class="hours-h"><h2 class="eyebrow">Dopodomani · ' + dayLong(da.date) + '</h2>' + badge(da) + '</div>' +
+        strip(da) +
+        '<div class="chips">' + (da.cheap || []).map(function (w) { return '<span class="chip best num">' + win(w) + '</span>'; }).join('') +
+        (da.dear && da.dear.length ? '<span class="chip">più care <span class="num">' + da.dear.map(win).join(', ') + '</span></span>' : '') +
+        '<span class="sub2">media <b class="num">' + f3(da.mean) + '</b> €/kWh · ' + delta(x, 'su domani', 'come domani') + '</span></div></div>';
+    }
+    right += '</div>';
+    return left + right;
+  }
+
+  /* --------------------------------------- fotovoltaico e accumulo (locale) */
+  function kw1(v) { return (v == null || isNaN(v)) ? '–' : nf1.format(v); }
+
+  function solarHtml() {
+    var S = D.solar;
+    if (!S || !S.days) return '';
+    var days = S.days, maxPv = Math.max.apply(null, pluck(days, 'pv_kwh').concat([0.1]));
+    var dayCells = days.map(function (d) {
+      var full = '';
+      if (S.battery_kwh > 0) {
+        full = '<div class="d">' + (d.battery_full_hours
+          ? 'batteria piena <span class="num">' + d.battery_full_hours + '</span> h <span class="mono nw">(' + (d.battery_full || []).map(win).join(', ') + ')</span>'
+          : 'batteria mai piena') + '</div>';
+      }
+      return '<div class="kpi"><div class="l">' + esc(cap(d.label)) + ' · ' + dm(d.date) + '</div>' +
+        '<div class="v num">' + kw1(d.pv_kwh) + '<small>kWh prodotti</small></div>' +
+        '<div class="d">surplus <span class="num">' + kw1(d.surplus_kwh) + '</span> kWh</div>' + full +
+        rangeBar(0, maxPv, 0, d.pv_kwh, null) + '</div>';
+    }).join('');
+    return '<h2 class="eyebrow" id="h-solar">Fotovoltaico e accumulo · oggi e prossimi ' + (days.length - 1) + ' giorni</h2>' +
+      '<div class="kpis pvdays">' + dayCells + '</div>';
+  }
+
+  var MODEL_IT = { 'naive-week': 'stessi prezzi della settimana precedente', 'mean-4w': 'media delle ultime 4 settimane',
+    'flat-28d': 'media degli ultimi 28 giorni', 'seasonal-ratio': 'andamento stagionale degli anni passati' };
+
+  /* "timestral-209m+meteo" → "Timestral-209M con meteo"; baseline → descrizione */
+  function modelName(m) {
+    if (!m) return '';
+    if (MODEL_IT[m]) return MODEL_IT[m];
+    var p = m.split('+'), b = p[0].replace(/^timestral-(\w+)$/, function (_, s) { return 'Timestral-' + s.toUpperCase(); });
+    return b + (p.length > 1 ? ' con ' + joinIt(p.slice(1)) : '');
+  }
+  function covOf(m) { return (m || '').split('+').slice(1); }
+
+  function relHtml() {
+    var R = D.reliability;
+    if (!R) return '<p><b class="muted" style="font-weight:500">Affidabilità: in calcolo.</b> <span class="muted">Le statistiche sul confronto fra previsioni passate e prezzi reali saranno disponibili a breve.</span></p>';
+    var hit = R.hit6 > 1 ? R.hit6 : R.hit6 * 6;
+    var s = '<p>Affidabilità (backtest su ' + R.n + ' previsioni): le 6 ore indicate come più economiche lo sono in media <span class="num">' +
+      nf1.format(hit) + '</span> su 6; il valore reale è dentro l’intervallo 90% nel <span class="num">' + pct(R.coverage90) + '</span> dei casi.';
+    if (R.mae_1 != null) s += ' Errore medio sul prezzo orario del giorno dopo: <span class="num">' + f3(R.mae_1) + '</span> €/kWh.';
+    s += '</p>';
+    if (R.is_baseline) {
+      s += '<p>Per le previsioni orarie la pagina usa al momento una regola statistica semplice (' + esc(modelName(R.model)) +
+        '), perché nel backtest il modello AI non l’ha battuta.</p>';
+    } else {
+      s += '<p>Previsione oraria: ' + esc(modelName(R.model)) + ' (Mistral AI)';
+      var miss = covOf(R.picked).filter(function (c) { return covOf(R.model).indexOf(c) < 0; });
+      if (R.picked && R.picked !== R.model && miss.length) {
+        s += '. Oggi i dati ' + esc(joinIt(miss)) + ' non erano disponibili: nel backtest il migliore era ' + esc(modelName(R.picked));
+      }
+      s += '.</p>';
+    }
+    if (R.figures_of && R.figures_of !== R.model) {
+      s += '<p class="muted">Il modello in uso non è nel backtest: le cifre qui sopra si riferiscono a ' + esc(modelName(R.figures_of)) + '.</p>';
+    }
+    if (R.as_of) s += '<p class="muted">Backtest aggiornato al ' + fDMY.format(pd(R.as_of)) + '.</p>';
+    return s;
+  }
+
+  /* ------------------------------------------------------------- pagina */
+  var gen = new Date(D.generated_at);
+  var genTxt = isNaN(gen) ? D.generated_at : new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome'
+  }).format(gen).replace(/\./g, '');
+  var attr = D.attribution || [];
+  var attrShort = attr.length ? attr[0].replace(/^[^:]*:\s*/, '').replace(/\s*\(.*?\)/g, '').replace(/,.*$/, '') : '';
+  var stale = !isNaN(gen) && (Date.now() - gen.getTime()) > 30 * 36e5;
+
+  var html =
+    '<header class="top"><h1 class="brand"><i aria-hidden="true"></i>' + esc(D.title || 'Previsione PUN') + '</h1>' +
+      '<ul class="meta"><li>Aggiornato ' + esc(genTxt) + '</li><li>' + esc(D.source_label || '') + '</li>' +
+      (attrShort ? '<li>Dati: ' + esc(attrShort) + '</li>' : '') + '</ul></header>' +
+    (stale ? '<p class="stale" role="status">Dati del ' + fDMY.format(gen) + ': aggiornamento non riuscito. Le previsioni potrebbero non essere aggiornate.</p>' : '') +
+    '<section class="sec grid g-trend" aria-label="Prezzi reali e previsione"><div class="charts">' + chartsHtml() + '</div>' +
+      '<div class="note">' + noteHtml() + '</div></section>' +
+    (D.solar ? '<section class="sec" aria-labelledby="h-solar">' + solarHtml() + '</section>' : '') +
+    '<section class="sec grid g-half"><div>' + monthsHtml() + '</div><div>' + fasceHtml() + '</div></section>' +
+    '<section class="sec grid g-week">' + weekHtml() + '</section>' +
+    '<section class="sec grid g-hours">' + hoursHtml() + '</section>' +
+    '<section class="sec rel" aria-label="Affidabilità">' + relHtml() + '</section>' +
+    '<footer class="foot"><p>Previsione statistica, non è un consiglio commerciale. Il prezzo in bolletta include oneri, trasporto e imposte.</p>' +
+      '<ul>' + attr.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul></footer>';
+  app.innerHTML = html;
+
+  var barsEl = document.getElementById('bars');
+  function drawAll() {
+    charts.forEach(function (ch) { trendChart(document.getElementById(ch.id), ch.sp); });
+    if (barsEl) barsChart(barsEl, tm);
+  }
+  drawAll();
+  var lastW = window.innerWidth, timer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (window.innerWidth !== lastW) { lastW = window.innerWidth; drawAll(); } }, 150);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawAll);
+})();
+</script>
+</body>
+</html>

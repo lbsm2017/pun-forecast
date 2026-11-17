@@ -1,0 +1,40 @@
+[project]
+name = "pun-forecast"
+version = "0.1.0"
+description = "Previsione del prezzo dell'elettricità (PUN) a 30 giorni e 3 mesi con Timestral, per famiglie e consumatori"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "requests>=2.31",
+    "torch>=2.4",
+    "timestral",
+]
+
+[project.optional-dependencies]
+# Solo flusso locale: prezzo del gas TTF (Yahoo Finance, uso personale).
+local = ["yfinance>=0.2.40"]
+
+[project.scripts]
+pun = "pun.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pun"]
+
+[tool.uv.sources]
+timestral = { git = "https://github.com/mistralai/timestral.git", rev = "a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff" }
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[dependency-groups]
+dev = ["pytest>=8"]

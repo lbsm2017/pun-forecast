@@ -1,0 +1,106 @@
+# Costruisce ogni giorno la pagina pubblica (profilo "public") e la pubblica
+# su GitHub Pages con un deploy diretto: niente branch gh-pages, i file
+# generati non vengono mai committati.
+name: Previsione PUN giornaliera
+
+on:
+  schedule:
+    # 13:00 UTC = 14:00 ora solare italiana (15:00 con l'ora legale),
+    # dopo la pubblicazione degli esiti del mercato del giorno prima (~13:00).
+    - cron: "0 13 * * *"
+    # Secondo giro: se gli esiti sono usciti in ritardo, "domani" passa da
+    # previsione a prezzi definitivi.
+    - cron: "30 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # il backtest settimanale (timestral-209m+meteo) richiede ~47 min di CPU
+    timeout-minutes: 120
+    env:
+      TZ: Europe/Rome           # "oggi" e "domani" nel fuso italiano
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Installa le dipendenze
+        run: uv sync --frozen
+
+      - name: Data di oggi
+        id: today
+        run: echo "date=$(date +%F)" >> "$GITHUB_OUTPUT"
+
+      # Pesi dei modelli Timestral (Hugging Face): chiave fissa, si salva
+      # solo se il job riesce (evita di conservare download incompleti).
+      - name: Cache pesi Timestral
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-timestral-28m-209m-v1
+
+      # Cache dei prezzi già scaricati e ultimo backtest: chiave nuova ogni
+      # giorno, si riparte dalla più recente.
+      - name: Ripristina cache dati
+        id: data-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            data/cache
+            data/backtest-public.json
+          key: pun-data-public-${{ steps.today.outputs.date }}-${{ github.run_id }}
+          restore-keys: |
+            pun-data-public-
+
+      - name: Costruisci la pagina
+        id: build
+        continue-on-error: true
+        run: uv run pun build --profile public --out site
+
+      # I prezzi del giorno dopo a volte escono in ritardo o la fonte non
+      # risponde: aspetta 10 minuti e riprova una volta.
+      - name: Riprova dopo 10 minuti
+        if: steps.build.outcome == 'failure'
+        run: |
+          echo "::warning::Primo tentativo fallito, nuovo tentativo tra 10 minuti"
+          sleep 600
+          uv run pun build --profile public --out site
+
+      - name: Salva cache dati
+        if: ${{ !cancelled() && steps.data-cache.outcome == 'success' }}
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            data/cache
+            data/backtest-public.json
+          key: ${{ steps.data-cache.outputs.cache-primary-key }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Pubblica su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

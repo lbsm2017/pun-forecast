@@ -1,0 +1,16 @@
+# Dati locali: mai nel repo (GME, gas, cache, output)
+/data/*
+!/data/README.md
+
+# Pagina generata dal flusso pubblico (pubblicata solo su GitHub Pages)
+/site/
+
+# Credenziali e ambiente
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Brainstorm mockups (locali)
+.superpowers/
