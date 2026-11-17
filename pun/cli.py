@@ -66,7 +66,7 @@ def _run(a, p, cache: Path, bt_path: Path, con: K.Console, t0: float) -> int:
         _done(con, t0, [
             ("Orario", f"{Bd.model_name(res['hourly_model'])} · errore a 7 giorni "
                        f"{Bd._it(h['mae_7'] / 1000, 3)} €/kWh"),
-            ("3 mesi", f"{res['daily_model']} · errore a 90 giorni {Bd._it(d['mae_90'] / 1000, 3)} €/kWh"),
+            ("3 mesi", f"{Bd.model_name(res['daily_model'])} · errore a 90 giorni {Bd._it(d['mae_90'] / 1000, 3)} €/kWh"),
         ], bt_path)
         return 0
 

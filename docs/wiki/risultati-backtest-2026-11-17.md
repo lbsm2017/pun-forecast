@@ -50,4 +50,20 @@ Profilo locale (7 zone): 28m 16,74 → 28m+meteo 15,28 (MAE 7 gg); gas +0,8% da 
 Senza alcuna previsione meteo (solo climatologia) il guadagno del meteo su 28m scende al 2,1%: il guadagno reale con le previsioni Open-Meteo è stimato 3–5%.
 Costo: backtest settimanale pubblico ≈ 47 min CPU (209m+meteo ≈ 65 s a previsione).
 
+## Backtest completo locale (2026-11-17, `make backtest` lanciato dall'utente, 71 min 36 s)
+
+PUN ufficiale GME + stima 7 zone, meteo 7 città, gas TTF; 26 emissioni orarie, 24 giornaliere. Da `data/backtest-local.json`.
+
+| Modello orario | MAE 1° g | MAE 7 gg | MAE 30 gg | Copertura 90% |
+|---|---|---|---|---|
+| naive-week | 18,6 | 20,8 | 25,9 | 0,80 |
+| timestral-28m | 14,0 | 16,7 | 23,5 | 0,90 |
+| timestral-209m | 12,8 | 15,7 | 22,7 | 0,90 |
+| timestral-28m+meteo | 13,8 | 15,3 | 22,7 | 0,90 |
+| timestral-28m+gas | 13,7 | 16,6 | 23,5 | 0,90 |
+| timestral-28m+meteo+gas | 13,7 | 15,3 | 22,7 | 0,90 |
+| **timestral-209m+meteo** (scelto) | **12,3** | **14,0** | 22,8 | 0,90 |
+
+Giornaliero 3 mesi: **timestral-28m** (scelto) MAE 90 gg 20,7 contro profilo stagionale 23,0 e media 28 giorni 26,0. Il backtest rapido locale aveva scelto il profilo stagionale: con quello completo il modello giornaliero locale coincide con quello pubblico. Il gas resta senza effetto misurabile sopra il meteo.
+
 Note: nota la baseline `mean-4w` aveva un bug nella banda (corretto il 2026-11-17 dopo questi numeri: la sua copertura è da rimisurare). Il periodo include il salto di regime 2025–2026 (media mensile da ~107 a ~249 €/MWh).
